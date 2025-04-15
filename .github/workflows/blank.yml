@@ -2,7 +2,7 @@ name: CI/CD Pipeline
 
 on:
   pull_request:
-    types: [closed]  # Kích hoạt khi PR được đóng
+    types: [closed]
     branches: [ "main" ]
 
 jobs:
@@ -22,6 +22,7 @@ jobs:
         run: |
           PR_TITLE="${{ github.event.pull_request.title }}"
           ISSUE_KEY=$(echo "$PR_TITLE" | grep -oE '[A-Z]+-[0-9]+')
+          echo "✅ Extracted ISSUE_KEY: $ISSUE_KEY"
           echo "issue_key=$ISSUE_KEY" >> $GITHUB_OUTPUT
 
       - name: Run CI tasks
@@ -47,11 +48,11 @@ jobs:
             https://dungssunny412.atlassian.net/rest/api/3/issue/${{ needs.build.outputs.issue_key }}/transitions
 
   slack-notify:
-    needs: jira-update
+    needs: [jira-update]
     runs-on: ubuntu-latest
     steps:
       - name: Send Slack notification
         run: |
           curl -X POST -H 'Content-type: application/json' \
-          --data '{"text":"✅ Issue *${{ needs.build.outputs.issue_key }}* đã được đóng sau khi merge PR: ${{ github.event.pull_request.html_url }}"}' \
+          --data "{\"text\":\"✅ Issue *${{ needs.build.outputs.issue_key }}* đã được đóng sau khi merge PR: ${{ github.event.pull_request.html_url }}\"}" \
           ${{ secrets.SLACK_WEBHOOK_URL }}
