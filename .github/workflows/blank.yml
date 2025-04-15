@@ -18,11 +18,13 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Extract Issue Key
-        id: extract
-        run: |
-          PR_TITLE="${{ github.event.pull_request.title }}"
-          ISSUE_KEY=$(echo "$PR_TITLE" | grep -oE '[A-Z]+-[0-9]+')
-          echo "issue_key=$ISSUE_KEY" >> $GITHUB_OUTPUT
+          id: etract
+          run: |
+            echo "PR Title: ${{ github.event.pull_request.title }}"
+            ISSUE_KEY=$(echo "${{ github.event.pull_request.title }}" | grep -oE '[A-Z]+-[0-9]+' || true)
+            echo "✅ Found ISSUE_KEY: $ISSUE_KEY"
+            echo "issue_key=$ISSUE_KEY" >> $GITHUB_OUTPUT
+
 
       - name: Run CI tasks
         run: |
