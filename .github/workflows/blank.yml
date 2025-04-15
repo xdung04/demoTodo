@@ -2,17 +2,27 @@ name: CI/CD Pipeline
 
 on:
   pull_request:
+    types: [closed]  # Kích hoạt khi PR được đóng
     branches: [ "main" ]
-  push:
-    branches: [ "main" ]
-  workflow_dispatch:
 
 jobs:
   build:
+    if: github.event.pull_request.merged == true
     runs-on: ubuntu-latest
+
+    outputs:
+      issue_key: ${{ steps.extract.outputs.issue_key }}
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Extract Issue Key
+        id: extract
+        run: |
+          PR_TITLE="${{ github.event.pull_request.title }}"
+          ISSUE_KEY=$(echo "$PR_TITLE" | grep -oE '[A-Z]+-[0-9]+')
+          echo "issue_key=$ISSUE_KEY" >> $GITHUB_OUTPUT
 
       - name: Run CI tasks
         run: |
@@ -21,16 +31,8 @@ jobs:
 
   jira-update:
     needs: build
-    if: github.event.pull_request.merged == true
     runs-on: ubuntu-latest
     steps:
-      - name: Extract Issue Key
-        id: extract
-        run: |
-          PR_TITLE="${{ github.event.pull_request.title }}"
-          ISSUE_KEY=$(echo "$PR_TITLE" | grep -oE '[A-Z]+-[0-9]+')
-          echo "ISSUE_KEY=$ISSUE_KEY" >> $GITHUB_OUTPUT
-
       - name: Update Jira issue status
         run: |
           curl -X POST \
@@ -42,7 +44,7 @@ jobs:
                 "id": "3"
               }
             }' \
-            https://dungssunny412.atlassian.net/rest/api/3/issue/${{ steps.extract.outputs.ISSUE_KEY }}/transitions
+            https://dungssunny412.atlassian.net/rest/api/3/issue/${{ needs.build.outputs.issue_key }}/transitions
 
   slack-notify:
     needs: jira-update
@@ -51,5 +53,5 @@ jobs:
       - name: Send Slack notification
         run: |
           curl -X POST -H 'Content-type: application/json' \
-          --data '{"text":"✅ Issue *${{ needs.jira-update.steps.extract.outputs.ISSUE_KEY }}* đã được đóng sau khi merge PR: ${{ github.event.pull_request.html_url }}"}' \
+          --data '{"text":"✅ Issue *${{ needs.build.outputs.issue_key }}* đã được đóng sau khi merge PR: ${{ github.event.pull_request.html_url }}"}' \
           ${{ secrets.SLACK_WEBHOOK_URL }}
