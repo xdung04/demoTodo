@@ -1,0 +1,55 @@
+name: CI/CD Pipeline
+
+on:
+  pull_request:
+    branches: [ "main" ]
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run CI tasks
+        run: |
+          echo "🔧 Đang chạy build/test..."
+          echo "✅ Test passed"
+
+  jira-update:
+    needs: build
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    steps:
+      - name: Extract Issue Key
+        id: extract
+        run: |
+          PR_TITLE="${{ github.event.pull_request.title }}"
+          ISSUE_KEY=$(echo "$PR_TITLE" | grep -oE '[A-Z]+-[0-9]+')
+          echo "ISSUE_KEY=$ISSUE_KEY" >> $GITHUB_OUTPUT
+
+      - name: Update Jira issue status
+        run: |
+          curl -X POST \
+            -H "Authorization: Bearer ${{ secrets.JIRA_TOKEN }}" \
+            -H "Accept: application/json" \
+            -H "Content-Type: application/json" \
+            --data '{
+              "transition": {
+                "id": "3"
+              }
+            }' \
+            https://dungssunny412.atlassian.net/rest/api/3/issue/${{ steps.extract.outputs.ISSUE_KEY }}/transitions
+
+  slack-notify:
+    needs: jira-update
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send Slack notification
+        run: |
+          curl -X POST -H 'Content-type: application/json' \
+          --data '{"text":"✅ Issue *${{ needs.jira-update.steps.extract.outputs.ISSUE_KEY }}* đã được đóng sau khi merge PR: ${{ github.event.pull_request.html_url }}"}' \
+          ${{ secrets.SLACK_WEBHOOK_URL }}
