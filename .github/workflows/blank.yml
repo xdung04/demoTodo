@@ -1,23 +1,25 @@
-name: Test Jira Update
+name: Java CI
 
 on:
-  workflow_dispatch:
-
+  pull_request:
+    branches:
+      - main 
 jobs:
-  jira-update:
+  build:
     runs-on: ubuntu-latest
+
     steps:
-      - name: Update Jira issue status (hardcoded)
-        run: |
-          ISSUE_KEY="TES-4"
-          echo "📌 Updating Jira issue: $ISSUE_KEY"
-          curl -X POST \
-            -H "Authorization: Bearer ${{ secrets.JIRA_TOKEN }}" \
-            -H "Accept: application/json" \
-            -H "Content-Type: application/json" \
-            --data '{
-              "transition": {
-                "id": "31"
-              }
-            }' \
-            https://dungssunny412.atlassian.net/rest/api/3/issue/$ISSUE_KEY/transitions
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
+      - name: Build with Maven
+        run: mvn -B package --file pom.xml
+
+      - name: Run tests
+        run: mvn test
